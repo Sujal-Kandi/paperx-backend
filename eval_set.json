@@ -1,0 +1,177 @@
+[
+  {
+    "q": "Why is the dot product scaled by the square root of d_k?",
+    "answerable": true,
+    "answer_any": [
+      "gradient"
+    ],
+    "quote_has": "gradients",
+    "pages": [
+      4
+    ]
+  },
+  {
+    "q": "How many attention heads does the base model use?",
+    "answerable": true,
+    "answer_any": [
+      "8",
+      "eight"
+    ],
+    "quote_has": "h = 8",
+    "pages": [
+      5
+    ]
+  },
+  {
+    "q": "What is the dimension of each attention head (d_k)?",
+    "answerable": true,
+    "answer_any": [
+      "64"
+    ],
+    "quote_has": "64",
+    "pages": [
+      5
+    ]
+  },
+  {
+    "q": "What functions does the positional encoding use?",
+    "answerable": true,
+    "answer_any": [
+      "sine",
+      "sin"
+    ],
+    "quote_has": "sinusoid",
+    "pages": [
+      6
+    ]
+  },
+  {
+    "q": "How many layers are in the encoder stack?",
+    "answerable": true,
+    "answer_any": [
+      "6",
+      "six"
+    ],
+    "quote_has": "N = 6",
+    "pages": null
+  },
+  {
+    "q": "Which optimizer did the authors use for training?",
+    "answerable": true,
+    "answer_any": [
+      "adam"
+    ],
+    "quote_has": "Adam",
+    "pages": null
+  },
+  {
+    "q": "What dropout rate was used for the base model?",
+    "answerable": true,
+    "answer_any": [
+      "0.1"
+    ],
+    "quote_has": "0.1",
+    "pages": null
+  },
+  {
+    "q": "What dataset was used for English-to-German training, and how big is it?",
+    "answerable": true,
+    "answer_any": [
+      "4.5 million"
+    ],
+    "quote_has": "4.5 million",
+    "pages": null
+  },
+  {
+    "q": "What is the model dimension d_model?",
+    "answerable": true,
+    "answer_any": [
+      "512"
+    ],
+    "quote_has": "512",
+    "pages": null
+  },
+  {
+    "q": "What is the inner-layer dimension of the feed-forward network?",
+    "answerable": true,
+    "answer_any": [
+      "2048",
+      "2,048"
+    ],
+    "quote_has": "2048",
+    "pages": null
+  },
+  {
+    "q": "How many warmup steps were used in the learning rate schedule?",
+    "answerable": true,
+    "answer_any": [
+      "4000",
+      "4,000"
+    ],
+    "quote_has": "4000",
+    "pages": null
+  },
+  {
+    "q": "What BLEU score did the big model get on English-to-German?",
+    "answerable": true,
+    "answer_any": [
+      "28.4"
+    ],
+    "quote_has": "28.4",
+    "pages": [
+      8
+    ]
+  },
+  {
+    "q": "What hardware was the model trained on?",
+    "answerable": true,
+    "answer_any": [
+      "p100"
+    ],
+    "quote_has": "P100",
+    "pages": null
+  },
+  {
+    "q": "What does masking in the decoder prevent?",
+    "answerable": true,
+    "answer_any": [
+      "future",
+      "subsequent",
+      "later"
+    ],
+    "quote_has": [
+      "subsequent",
+      "leftward information flow"
+    ],
+    "pages": null
+  },
+  {
+    "q": "Which activation function is used in the feed-forward network?",
+    "answerable": true,
+    "answer_any": [
+      "relu"
+    ],
+    "quote_has": "ReLU",
+    "pages": null
+  },
+  {
+    "q": "Does this paper use RLHF?",
+    "answerable": false
+  },
+  {
+    "q": "What score did the model get on the GLUE benchmark?",
+    "answerable": false
+  },
+  {
+    "q": "How many parameters does GPT-3 have?",
+    "answerable": false
+  },
+  {
+    "q": "Does the paper use rotary position embeddings?",
+    "answerable": false
+  },
+  {
+    "q": "What was the carbon footprint of training the model?",
+    "answerable": false
+  }
+]

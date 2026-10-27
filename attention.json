@@ -1,0 +1,352 @@
+{
+  "id": "attention-is-all-you-need",
+  "title": "Attention Is All You Need",
+  "authors": [
+    "Vaswani",
+    "Shazeer",
+    "Parmar",
+    "Uszkoreit",
+    "Jones",
+    "Gomez",
+    "Kaiser",
+    "Polosukhin"
+  ],
+  "year": 2017,
+  "arxiv_url": "https://arxiv.org/abs/1706.03762",
+  "hook": "In 2017, the leading translation models were built on recurrent or convolutional networks, and the recurrent ones read a sentence one word at a time, passing a memory forward like a game of telephone. They worked, but training was slow and distant words were hard to connect. This paper asked a blunt question: what if we throw the memory chain away and let every word look at every other word directly?",
+  "read_minutes": 12,
+  "unlocked": [
+    "BERT",
+    "GPT",
+    "Vision Transformer"
+  ],
+  "sections": [
+    {
+      "id": "bottleneck",
+      "beat": "problem",
+      "title": "The bottleneck",
+      "intuition": "An RNN reads word 1, then word 2, then word 3, and each step must wait for the one before it. Within a single sentence, extra hardware doesn't help, because step 5 needs step 4's output. And the farther back a word is, the harder it is for the model to make use of it.",
+      "mechanism": "A recurrent layer computes a hidden state h_t from the previous state h_(t-1) and the current input x_t. Because h_t depends on h_(t-1), positions within one sequence can't be computed in parallel, and information from early words has to survive many steps to reach later ones.",
+      "think_first": "If a model could read the whole sentence at once, what would it lose?",
+      "think_first_answer": "Order. Reading in sequence gives you word order for free. Reading everything at once means the model needs another way to know which word came first. That's positional encoding, coming in a later section.",
+      "sources": [
+        {
+          "page": 2,
+          "quote": "This inherently sequential nature precludes parallelization within training examples",
+          "verified": true
+        },
+        {
+          "page": 6,
+          "quote": "The shorter these paths between any combination of positions in the input and output sequences, the easier it is to learn long-range dependencies",
+          "verified": true
+        }
+      ],
+      "visuals": [
+        "rnn_vs_attention"
+      ],
+      "analogy": {
+        "text": "Think of the telephone game. A message passes through six people, and each one can only start after the one before finishes. By the end, the first details are blurry.",
+        "breaks": "An RNN doesn't garble randomly. It carries everything read so far in a fixed-size hidden state, so details from early words can get crowded out."
+      },
+      "next_teaser": "So what if every word could look at every other word directly? That's the bet the authors made."
+    },
+    {
+      "id": "bet",
+      "beat": "idea",
+      "title": "The bet: attention only",
+      "intuition": "Instead of passing memory along a chain, let every word look directly at every other word and decide which ones matter. The authors called the resulting model the Transformer.",
+      "mechanism": "Self-attention connects any two positions in a single step, so the path between two words has constant length, versus up to n steps in a recurrent layer. All positions are computed at the same time, which is exactly what GPUs are good at.",
+      "think_first": "How would a word decide which other words matter?",
+      "think_first_answer": "By scoring every other word against itself and using those scores as weights. That scoring step is exactly what the next section builds: queries, keys, and values.",
+      "then_vs_now": {
+        "paper": "The original Transformer is an encoder-decoder model built for translation.",
+        "now": "Many modern LLMs (GPT-style models, Llama) keep only the decoder stack and are trained to predict the next word."
+      },
+      "sources": [
+        {
+          "page": 1,
+          "quote": "based solely on attention mechanisms, dispensing with recurrence and convolutions entirely",
+          "verified": true
+        },
+        {
+          "page": 6,
+          "quote": "a self-attention layer connects all positions with a constant number of sequentially executed operations",
+          "verified": true
+        }
+      ],
+      "analogy": {
+        "text": "Instead of passing notes down a line, put everyone in one room where anyone can talk to anyone.",
+        "breaks": "Talking isn't free. Every pair takes work, and that cost shows up in the last section."
+      },
+      "next_teaser": "But how does a word decide which other words matter? The answer is three small vectors: a query, a key, and a value."
+    },
+    {
+      "id": "qkv",
+      "beat": "mechanism",
+      "title": "Queries, keys, values",
+      "intuition": "Think of a search. Each word asks a question (its query). Every word also advertises a label (its key) and holds some content (its value). Match each question against all the labels, then collect content from the best matches.",
+      "mechanism": "Take the dot product of each query with every key to get a score. Divide by the square root of d_k, apply softmax to turn scores into weights that sum to 1, then use those weights to take a weighted sum of the values.",
+      "equation": "\\mathrm{Attention}(Q,K,V)=\\mathrm{softmax}\\!\\left(\\frac{QK^{T}}{\\sqrt{d_k}}\\right)V",
+      "code": {
+        "pytorch": "import math\nimport torch\nimport torch.nn.functional as F\n\n\ndef scaled_dot_product_attention(q, k, v, mask=None):\n    # q, k: [B, T, d_k]   v: [B, T, d_v]\n    d_k = q.size(-1)\n    scores = q @ k.transpose(-2, -1) / math.sqrt(d_k)  # [B, T, T]\n    if mask is not None:\n        scores = scores.masked_fill(mask == 0, float(\"-inf\"))\n    weights = F.softmax(scores, dim=-1)  # [B, T, T], each row sums to 1\n    return weights @ v, weights  # output: [B, T, d_v]\n",
+        "shapes": {
+          "q, k": "[B, T, d_k]",
+          "v": "[B, T, d_v]",
+          "scores / weights": "[B, T, T]",
+          "output": "[B, T, d_v]"
+        }
+      },
+      "think_first": "Why divide by the square root of d_k?",
+      "think_first_answer": "If the components of q and k have unit variance, their dot product has variance d_k. For large d_k the scores get huge, softmax saturates toward a single spike, and its gradients become tiny. Dividing by √d_k brings the variance back to 1.",
+      "then_vs_now": {
+        "paper": "Computes the full T×T score matrix, so per-layer cost grows with the square of the sequence length (Table 1: O(n²·d)).",
+        "now": "The math is unchanged, but kernels like FlashAttention compute it in tiles without ever storing the full T×T matrix in GPU memory, which is one big reason long contexts became practical."
+      },
+      "sources": [
+        {
+          "page": 4,
+          "quote": "We compute the dot products of the query with all keys, divide each by √dk, and apply a softmax function",
+          "verified": true
+        },
+        {
+          "page": 4,
+          "quote": "the dot products grow large in magnitude, pushing the softmax function into regions where it has extremely small gradients",
+          "verified": true
+        },
+        {
+          "page": 4,
+          "quote": "assume that the components of q and k are independent random variables with mean 0 and variance 1",
+          "verified": true
+        },
+        {
+          "page": 6,
+          "verified": true
+        }
+      ],
+      "visuals": [
+        "attention_stepper",
+        "scaling_demo"
+      ],
+      "analogy": {
+        "text": "Think of the scores as microphone volumes. If they're all turned up too loud, softmax hears only the loudest voice and ignores the rest. Dividing by √d_k turns the volume back to a level where several voices can be heard.",
+        "breaks": "Softmax doesn't literally listen. The real problem is that its gradients shrink to almost nothing when one score dominates, so the model stops learning."
+      },
+      "next_teaser": "One attention gives each word a single view of the sentence. What if you could look at it eight different ways at once?"
+    },
+    {
+      "id": "heads",
+      "beat": "mechanism",
+      "title": "Many heads",
+      "intuition": "Instead of one big attention, run eight smaller ones side by side. Each head gets its own 64-dimension view of the sentence and is free to look for a different kind of relationship. Their results are then stitched back together.",
+      "mechanism": "Each head has its own learned projections that map the 512-dimension input down to 64 dimensions for queries, keys, and values. All 8 heads run scaled dot-product attention in parallel. Their outputs are concatenated back to 512 dimensions and passed through one more linear layer. Because each head is smaller, the total cost is similar to one full-size head. In their ablation, single-head attention was 0.9 BLEU worse than the best setting, and quality also dropped when there were too many heads.",
+      "equation": "\\mathrm{MultiHead}(Q,K,V)=\\mathrm{Concat}(\\mathrm{head}_1,\\dots,\\mathrm{head}_h)W^{O},\\quad \\mathrm{head}_i=\\mathrm{Attention}(QW_i^{Q},KW_i^{K},VW_i^{V})",
+      "code": {
+        "pytorch": "import math\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\n\nclass MultiHeadAttention(nn.Module):\n    def __init__(self, d_model=512, h=8):\n        super().__init__()\n        assert d_model % h == 0\n        self.h, self.d_k = h, d_model // h  # 8 heads, 64 dims each\n        self.w_q = nn.Linear(d_model, d_model)\n        self.w_k = nn.Linear(d_model, d_model)\n        self.w_v = nn.Linear(d_model, d_model)\n        self.w_o = nn.Linear(d_model, d_model)\n\n    def forward(self, q, k, v, mask=None):\n        # q, k, v: [B, T, d_model]\n        B = q.size(0)\n\n        def split(x):  # [B, T, d_model] -> [B, h, T, d_k]\n            return x.view(B, -1, self.h, self.d_k).transpose(1, 2)\n\n        q, k, v = split(self.w_q(q)), split(self.w_k(k)), split(self.w_v(v))\n        scores = q @ k.transpose(-2, -1) / math.sqrt(self.d_k)  # [B, h, T, T]\n        if mask is not None:\n            scores = scores.masked_fill(mask == 0, float(\"-inf\"))\n        out = F.softmax(scores, dim=-1) @ v                      # [B, h, T, d_k]\n        out = out.transpose(1, 2).reshape(B, -1, self.h * self.d_k)  # [B, T, d_model]\n        return self.w_o(out)\n",
+        "shapes": {
+          "input / output": "[B, T, d_model=512]",
+          "per-head q, k, v": "[B, h=8, T, d_k=64]",
+          "scores": "[B, h, T, T]"
+        }
+      },
+      "think_first": "Why use 8 small views instead of 1 big one?",
+      "think_first_answer": "A single attention gives each word one weighted average of the others, which blurs different kinds of relationships together. Separate heads can each specialize in a different pattern, and since each head is only 64 dimensions, the total compute stays about the same.",
+      "then_vs_now": {
+        "paper": "Every one of the 8 heads has its own queries, keys, and values.",
+        "now": "Many modern LLMs, such as Llama 2 and Mistral, let groups of query heads share keys and values (grouped-query attention) to shrink the memory used while generating text."
+      },
+      "sources": [
+        {
+          "page": 5,
+          "para_idx": 4,
+          "quote": "we employ h = 8 parallel attention layers, or heads",
+          "verified": true
+        },
+        {
+          "page": 5,
+          "para_idx": 4,
+          "quote": "For each of these we use dk = dv = dmodel/h = 64",
+          "verified": true
+        },
+        {
+          "page": 5,
+          "quote": "Multi-head attention allows the model to jointly attend to information from different representation subspaces at different positions",
+          "verified": true
+        },
+        {
+          "page": 9,
+          "quote": "single-head attention is 0.9 BLEU worse than the best setting",
+          "verified": true
+        }
+      ],
+      "visuals": [
+        "multi_head_split"
+      ],
+      "analogy": {
+        "text": "Picture several highlighters in different colors reading the same page. One marks who did what, another marks what refers to what.",
+        "breaks": "Nobody assigns the heads their jobs. Each learns what helps, and later research (Michel et al., 2019) found that many heads can be removed at test time with little loss."
+      },
+      "next_teaser": "There's a catch. Attention can't tell \"dog bites man\" from \"man bites dog\". How does the model know the order?"
+    },
+    {
+      "id": "positions",
+      "beat": "mechanism",
+      "title": "Where am I? Positions",
+      "intuition": "Attention treats a sentence like a bag of words: \"dog bites man\" and \"man bites dog\" would look identical. So each word's vector gets a position signature added to it, a unique pattern of waves that cycle at different speeds.",
+      "mechanism": "For each position, even dimensions get a sine and odd dimensions get a cosine, at wavelengths forming a geometric progression from 2π up to 10000·2π. The result has the same width as the word embedding (d_model), so the two are simply added. The authors also tried learned position embeddings and found nearly identical results.",
+      "equation": "PE_{(pos,2i)}=\\sin\\!\\left(\\frac{pos}{10000^{2i/d_{\\mathrm{model}}}}\\right),\\quad PE_{(pos,2i+1)}=\\cos\\!\\left(\\frac{pos}{10000^{2i/d_{\\mathrm{model}}}}\\right)",
+      "code": {
+        "pytorch": "import math\nimport torch\n\n\ndef sinusoidal_positions(max_len, d_model):\n    pos = torch.arange(max_len).unsqueeze(1)             # [max_len, 1]\n    i2 = torch.arange(0, d_model, 2)                      # 0, 2, 4, ...\n    div = torch.exp(-math.log(10000.0) * i2 / d_model)    # 1 / 10000^(2i/d_model)\n    pe = torch.zeros(max_len, d_model)\n    pe[:, 0::2] = torch.sin(pos * div)                    # even dims: sin\n    pe[:, 1::2] = torch.cos(pos * div)                    # odd dims: cos\n    return pe                                             # [max_len, d_model]\n",
+        "shapes": {
+          "output": "[max_len, d_model]",
+          "added to embeddings": "[B, T, d_model] + [T, d_model]"
+        }
+      },
+      "think_first": "If you shuffle the words, what does attention see?",
+      "think_first_answer": "Nothing different. Attention on its own has no sense of order, so shuffled input just gives shuffled output. Position information has to be injected, and that is what the sine and cosine pattern does.",
+      "then_vs_now": {
+        "paper": "Fixed sinusoids are added to the input embeddings at the bottom of both the encoder and decoder stacks.",
+        "now": "Many modern LLMs, such as Llama, use rotary position embeddings (RoPE), which apply position to the queries and keys inside each attention layer instead of adding it once at the input."
+      },
+      "sources": [
+        {
+          "page": 6,
+          "para_idx": 3,
+          "quote": "in order for the model to make use of the order of the sequence, we must inject some information",
+          "verified": true
+        },
+        {
+          "page": 6,
+          "para_idx": 5,
+          "quote": "each dimension of the positional encoding corresponds to a sinusoid",
+          "verified": true
+        },
+        {
+          "page": 6,
+          "quote": "found that the two versions produced nearly identical results",
+          "verified": true
+        }
+      ],
+      "visuals": [
+        "positional_heatmap"
+      ],
+      "analogy": {
+        "text": "Picture a clock with many hands ticking at different speeds. Reading all the hands together tells you the exact moment, and no two moments look the same.",
+        "breaks": "The hands here are 256 sine and cosine pairs (for d_model = 512), not three, and their readings are added to each word's vector instead of being read from a dial."
+      },
+      "next_teaser": "You now have all the parts. How do they snap together into the full machine?"
+    },
+    {
+      "id": "machine",
+      "beat": "mechanism",
+      "title": "The full machine",
+      "intuition": "The model is a stack of 6 identical blocks. Each block first lets words talk to each other (attention), then lets each word think on its own (a small feed-forward network). Shortcut connections and normalization keep deep stacks trainable. The decoder adds a mask so it can't see words it hasn't generated yet.",
+      "mechanism": "An encoder layer has two sublayers: multi-head self-attention, then a position-wise feed-forward network (512 to 2048 to 512, with ReLU). Each sublayer is wrapped as LayerNorm(x + Sublayer(x)). A decoder layer has the same two, plus masked self-attention and an encoder-decoder attention step whose queries come from the decoder and whose keys and values come from the encoder output.",
+      "equation": "\\mathrm{FFN}(x)=\\max(0,\\,xW_1+b_1)W_2+b_2",
+      "code": {
+        "pytorch": "import torch.nn as nn\n\n# MultiHeadAttention is the module from the previous section.\n\n\nclass EncoderLayer(nn.Module):\n    def __init__(self, d_model=512, h=8, d_ff=2048, p_drop=0.1):\n        super().__init__()\n        self.attn = MultiHeadAttention(d_model, h)\n        self.ff = nn.Sequential(\n            nn.Linear(d_model, d_ff), nn.ReLU(), nn.Linear(d_ff, d_model)\n        )\n        self.norm1, self.norm2 = nn.LayerNorm(d_model), nn.LayerNorm(d_model)\n        self.drop = nn.Dropout(p_drop)\n\n    def forward(self, x, mask=None):\n        # x: [B, T, d_model]; each sublayer is LayerNorm(x + Sublayer(x))\n        x = self.norm1(x + self.drop(self.attn(x, x, x, mask)))\n        return self.norm2(x + self.drop(self.ff(x)))\n",
+        "shapes": {
+          "input / output": "[B, T, d_model=512]",
+          "inside the FFN": "[B, T, d_ff=2048]"
+        }
+      },
+      "think_first": "Why must the decoder not see future words?",
+      "think_first_answer": "When the model is generating, future words don't exist yet. During training all positions are processed at once, so the mask is what stops position i from peeking at later words and simply copying the answer.",
+      "then_vs_now": {
+        "paper": "Normalization comes after each sublayer, with ReLU in the feed-forward network.",
+        "now": "Many modern LLMs, such as Llama, normalize before each sublayer (often with RMSNorm) and use gated activations like SwiGLU instead of ReLU."
+      },
+      "sources": [
+        {
+          "page": 3,
+          "quote": "The encoder is composed of a stack of N = 6 identical layers",
+          "verified": true
+        },
+        {
+          "page": 3,
+          "quote": "the decoder inserts a third sub-layer, which performs multi-head attention over the output of the encoder stack",
+          "verified": true
+        },
+        {
+          "page": 5,
+          "quote": "This consists of two linear transformations with a ReLU activation in between",
+          "verified": true
+        }
+      ],
+      "analogy": {
+        "text": "Picture an assembly line of 6 stations. At each one, the words first confer with each other (attention), then each goes off to think on its own (feed-forward). A shortcut lane lets the original pass straight through, so nothing gets lost.",
+        "breaks": "Every station has the same design but its own learned settings, and the decoder adds extra stations that read the encoder's output."
+      },
+      "next_teaser": "It looks elegant on paper. But did it actually beat the best translation systems?"
+    },
+    {
+      "id": "proof",
+      "beat": "proof",
+      "title": "Does it actually work?",
+      "intuition": "Yes, and it was cheaper to train. On English to German the big model scored 28.4 BLEU, beating the best earlier systems (ensembles included) by more than 2 BLEU. On English to French it set a new single-model record of 41.8 BLEU at less than a quarter of the previous record holder's training cost. The big models trained for 3.5 days on eight GPUs.",
+      "mechanism": "BLEU measures overlap between the model's translation and human reference translations, so higher is better. The authors also varied parts of the base model (number of heads, key size, model size, dropout, positional encoding) to see which choices mattered, and tested the model on English constituency parsing, a very different task.",
+      "think_first": "What would convince you this isn't a fluke?",
+      "think_first_answer": "Several things together: beating strong baselines on two language pairs, ablations that change one thing at a time, and working on a different task entirely. The paper provides all three.",
+      "sources": [
+        {
+          "page": 1,
+          "quote": "establishes a new single-model state-of-the-art BLEU score of 41.8",
+          "verified": true
+        },
+        {
+          "page": 8,
+          "quote": "establishing a new state-of-the-art BLEU score of 28.4",
+          "verified": true
+        },
+        {
+          "page": 8,
+          "quote": "at less than 1/4 the training cost of the previous state-of-the-art model",
+          "verified": true
+        },
+        {
+          "page": 10,
+          "quote": "despite the lack of task-specific tuning our model performs surprisingly well",
+          "verified": true
+        }
+      ],
+      "analogy": {
+        "text": "BLEU is like grading a translation by counting how many phrases match an answer key written by humans.",
+        "breaks": "Two good translations can use different words, so BLEU can undervalue a correct translation that is worded differently from the key."
+      },
+      "next_teaser": "It did, and then it changed everything. How far did the idea go, and what's the catch?"
+    },
+    {
+      "id": "impact",
+      "beat": "impact",
+      "title": "What it unlocked",
+      "intuition": "Almost everything. Keep only the encoder and you get BERT. Keep only the decoder and you get the GPT family. Apply the same idea to image patches and you get Vision Transformers. The catch: every word looking at every word gets expensive as text gets longer.",
+      "mechanism": "Self-attention compares every position with every other, so cost grows with the square of the sequence length: doubling the text makes attention about 4 times as expensive. For ordinary sentence lengths the paper found self-attention is actually cheaper than a recurrent layer, so the quadratic cost bites on long inputs. The paper itself flags restricted, local attention as future work for very long inputs.",
+      "think_first": "What's the catch with every word seeing every word?",
+      "think_first_answer": "The cost grows with the square of the length. 1,000 words means 1,000,000 word pairs, and 10 times longer text means 100 times more pairs. That quadratic cost is why long context needed so much extra engineering.",
+      "then_vs_now": {
+        "paper": "Full attention over the whole sequence, with restricted (local) attention suggested as future work.",
+        "now": "Sliding-window attention, used in models like Mistral 7B, limits each token to a fixed window so cost grows linearly. Other tricks (grouped-query attention, FlashAttention) cut memory and time, and many LLMs still use full attention over the context."
+      },
+      "sources": [
+        {
+          "page": 6,
+          "quote": "self-attention layers are faster than recurrent layers",
+          "verified": true
+        },
+        {
+          "page": 7,
+          "quote": "self-attention could be restricted to considering only a neighborhood of size r",
+          "verified": true
+        },
+        {
+          "page": 10,
+          "quote": "investigate local, restricted attention mechanisms to efficiently handle large inputs and outputs",
+          "verified": true
+        }
+      ],
+      "analogy": {
+        "text": "In a room of n people, everyone shaking hands with everyone takes about n²/2 handshakes. Double the people and the handshakes roughly quadruple.",
+        "breaks": "Attention compares pairs with weighted math, not handshakes, and tricks like sliding windows let each word talk only to its neighbors."
+      }
+    }
+  ]
+}

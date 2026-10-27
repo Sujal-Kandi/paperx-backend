@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+groq
+python-dotenv
+chromadb
+pymupdf
+requests
+rank_bm25
+pydantic
